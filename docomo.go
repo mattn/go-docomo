@@ -5,9 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 )
 
 const (
@@ -86,7 +84,7 @@ func (c *Client) Conversation(utt string) (*ConversationResponse, error) {
 	defer res.Body.Close()
 	if res.StatusCode == 200 {
 		var r ConversationResponse
-		err = json.NewDecoder(io.TeeReader(res.Body, os.Stdout)).Decode(&r)
+		err = json.NewDecoder(res.Body).Decode(&r)
 		if err != nil {
 			return nil, err
 		}

@@ -69,7 +69,8 @@ func main() {
 			text := m.Text[len(nick)+2:]
 			res, err := c.Conversation(text)
 			if err != nil {
-				log.Fatal(err)
+				http.Error(w, err.Error(), 500)
+				return
 			}
 			w.Header().Set("Content-Type", "text/plain")
 			w.Write([]byte(fmt.Sprintf("%s: %s", m.Nickname, res.Utt)))
