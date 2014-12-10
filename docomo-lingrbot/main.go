@@ -23,6 +23,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer f.Close()
 	var cfg config
 	err = json.NewDecoder(f).Decode(&cfg)
 	if err != nil {
@@ -38,6 +39,7 @@ func main() {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
+			defer f.Close()
 			w.Header().Set("Content-Type", "text/html")
 			io.Copy(w, f)
 			return
