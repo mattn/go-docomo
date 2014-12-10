@@ -1,4 +1,4 @@
-package docomoru
+package docomo
 
 import (
 	"bytes"
@@ -60,7 +60,7 @@ type ConversationResponse struct {
 	Utt     string `json:"utt"`
 	Yomi    string `json:"yomi"`
 	Mode    string `json:"mode"`
-	Da      int    `json:"da"`
+	Da      string `json:"da"`
 	Context string `json:"context"`
 }
 

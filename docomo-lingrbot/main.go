@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mattn/go-docomoru"
+	"github.com/mattn/go-docomo"
 	"github.com/mattn/go-lingr"
 	"log"
 	"net/http"
@@ -12,9 +12,9 @@ import (
 )
 
 type config struct {
-	Apikey string        `json:"apikey"`
-	Addr   string        `json:"addr"`
-	User   docomoru.User `json:"user"`
+	Apikey string      `json:"apikey"`
+	Addr   string      `json:"addr"`
+	User   docomo.User `json:"user"`
 }
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c := docomoru.NewClient(cfg.Apikey, cfg.User)
+	c := docomo.NewClient(cfg.Apikey, cfg.User)
 
 	nick := cfg.User.Nickname
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -46,10 +46,10 @@ func main() {
 				if m == nil {
 					continue
 				}
-				if !strings.HasPrefix(m.Text, nick + ":") {
+				if !strings.HasPrefix(m.Text, nick+":") {
 					continue
 				}
-				text := m.Text[len(nick) + 2:]
+				text := m.Text[len(nick)+2:]
 				res, err := c.Conversation(text)
 				if err != nil {
 					log.Fatal(err)
