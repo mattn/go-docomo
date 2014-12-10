@@ -32,6 +32,7 @@ func main() {
 	c := docomo.NewClient(cfg.Apikey, cfg.User)
 
 	nick := cfg.User.Nickname
+	http.Handle("/assets/", http.FileServer(http.Dir(".")))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			f, err := os.Open("index.html")

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 )
 
 const (
@@ -20,6 +19,7 @@ type Client struct {
 	apikey  string
 	user    User
 	context string
+	mode    string
 }
 
 type User struct {
@@ -33,12 +33,12 @@ type User struct {
 	Age            int    `json:"age"`            //ユーザの年齢を設定します。正の整数(半角3文字以下)
 	Constellations string `json:"constellations"` //ユーザの星座を設定します。牡羊座、牡牛座、双子座、蟹座、獅子座、乙女座、天秤座、蠍座、射手座、山羊座、水瓶座、魚座のいずれか
 	Place          string `json:"place"`          //ユーザの地域情報を設定します。仕様書 2.4「場所リスト」に含まれるもののいずれか
-	Mode           string `json:"mode"`           //現在の対話のモード。システムから出力されたmodeを入力することによりしりとりを継続,dialogまたはsrtr　デフォルト：dialog
 }
 
 type post struct {
 	User
 	Context string `json:"context"` //システムから出力されたcontextを入力することにより会話を継続します。255文字以下
+	Mode    string `json:"mode"`    //現在の対話のモード。システムから出力されたmodeを入力することによりしりとりを継続,dialogまたはsrtr　デフォルト：dialog
 	Utt     string `json:"utt"`     //ユーザの発話を入力します。255文字以下
 }
 
@@ -48,12 +48,11 @@ func NewClient(apikey string, u User) *Client {
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	transport.Proxy = http.ProxyFromEnvironment
 	client.Transport = transport
-	return &Client{
-		client,
-		apikey,
-		u,
-		"",
-	}
+	c := new(Client)
+	c.c = client
+	c.apikey = apikey
+	c.user = u
+	return c
 }
 
 type ConversationResponse struct {
@@ -68,13 +67,14 @@ func (c *Client) Conversation(utt string) (*ConversationResponse, error) {
 	var p post
 	p.User = c.user
 	p.Utt = utt
+	p.Context = c.context
+	p.Mode = c.mode
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(p)
 	if err != nil {
 		return nil, err
 	}
-	println(buf.String())
-	req, err := http.NewRequest("POST", fmt.Sprintf(conversationURL, c.apikey), strings.NewReader(buf.String()))
+	req, err := http.NewRequest("POST", fmt.Sprintf(conversationURL, c.apikey), &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +91,7 @@ func (c *Client) Conversation(utt string) (*ConversationResponse, error) {
 			return nil, err
 		}
 		c.context = r.Context
+		c.mode = r.Mode
 		return &r, nil
 	}
 	return nil, fmt.Errorf("Conversation:", res.Status)
