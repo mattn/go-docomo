@@ -139,7 +139,7 @@ func (c *Client) CharacterRecognition(ct, filename string, data []byte) (*Charac
 	defer res.Body.Close()
 	if res.StatusCode == 200 {
 		var r CharacterRecognitionResult
-		err = json.NewDecoder(res.Body, os.Stdout).Decode(&r)
+		err = json.NewDecoder(res.Body).Decode(&r)
 		if err != nil {
 			return nil, err
 		}
