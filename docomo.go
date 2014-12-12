@@ -5,11 +5,16 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
+	"os"
 )
 
 const (
-	conversationURL = "https://api.apigw.smt.docomo.ne.jp/dialogue/v1/dialogue?APIKEY=%s"
+	dialogueURL             = "https://api.apigw.smt.docomo.ne.jp/dialogue/v1/dialogue?APIKEY=%s"
+	characterRecognitionURL = "https://api.apigw.smt.docomo.ne.jp/characterRecognition/v1/line?APIKEY=%s"
 )
 
 type Client struct {
@@ -33,13 +38,6 @@ type User struct {
 	Place          string `json:"place"`          //ユーザの地域情報を設定します。仕様書 2.4「場所リスト」に含まれるもののいずれか
 }
 
-type post struct {
-	User
-	Context string `json:"context"` //システムから出力されたcontextを入力することにより会話を継続します。255文字以下
-	Mode    string `json:"mode"`    //現在の対話のモード。システムから出力されたmodeを入力することによりしりとりを継続,dialogまたはsrtr　デフォルト：dialog
-	Utt     string `json:"utt"`     //ユーザの発話を入力します。255文字以下
-}
-
 func NewClient(apikey string, u User) *Client {
 	client := new(http.Client)
 	transport := new(http.Transport)
@@ -53,7 +51,7 @@ func NewClient(apikey string, u User) *Client {
 	return c
 }
 
-type ConversationResponse struct {
+type DialogueResponse struct {
 	Utt     string `json:"utt"`
 	Yomi    string `json:"yomi"`
 	Mode    string `json:"mode"`
@@ -61,7 +59,13 @@ type ConversationResponse struct {
 	Context string `json:"context"`
 }
 
-func (c *Client) Conversation(utt string) (*ConversationResponse, error) {
+func (c *Client) Dialogue(utt string) (*DialogueResponse, error) {
+	type post struct {
+		User
+		Context string `json:"context"` //システムから出力されたcontextを入力することにより会話を継続します。255文字以下
+		Mode    string `json:"mode"`    //現在の対話のモード。システムから出力されたmodeを入力することによりしりとりを継続,dialogまたはsrtr　デフォルト：dialog
+		Utt     string `json:"utt"`     //ユーザの発話を入力します。255文字以下
+	}
 	var p post
 	p.User = c.user
 	p.Utt = utt
@@ -72,7 +76,7 @@ func (c *Client) Conversation(utt string) (*ConversationResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf(conversationURL, c.apikey), &buf)
+	req, err := http.NewRequest("POST", fmt.Sprintf(dialogueURL, c.apikey), &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +87,7 @@ func (c *Client) Conversation(utt string) (*ConversationResponse, error) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode == 200 {
-		var r ConversationResponse
+		var r DialogueResponse
 		err = json.NewDecoder(res.Body).Decode(&r)
 		if err != nil {
 			return nil, err
@@ -92,5 +96,55 @@ func (c *Client) Conversation(utt string) (*ConversationResponse, error) {
 		c.mode = r.Mode
 		return &r, nil
 	}
-	return nil, fmt.Errorf("Conversation:", res.Status)
+	return nil, fmt.Errorf("Dialogue: %s", res.Status)
+}
+
+type CharacterRecognitionResult struct {
+	Words struct {
+		Word []struct {
+			Text string `json:"@text"`
+		} `json:"word"`
+	} `json:"words"`
+	Message struct {
+		Text string `json:"@text"`
+	} `json:"message"`
+}
+
+func (c *Client) CharacterRecognition(ct, filename string, data []byte) (*CharacterRecognitionResult, error) {
+	var buf bytes.Buffer
+
+	w := multipart.NewWriter(&buf)
+	part := make(textproto.MIMEHeader)
+	part.Set("Content-Type", ct)
+    part.Set("Content-Disposition", fmt.Sprintf(`form-data; name="image"; filename="%s"`, filename))
+    f, err := w.CreatePart(part)
+    if err != nil {
+		return nil, err
+	}
+	_, err = f.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	w.Close()
+	ct = w.FormDataContentType()
+	req, err := http.NewRequest("POST", fmt.Sprintf(characterRecognitionURL, c.apikey), &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", ct)
+	res, err := c.c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode == 200 {
+		var r CharacterRecognitionResult
+		err = json.NewDecoder(res.Body, os.Stdout).Decode(&r)
+		if err != nil {
+			return nil, err
+		}
+		return &r, nil
+	}
+	io.Copy(os.Stdout, res.Body)
+	return nil, fmt.Errorf("CharacterRecognition: %s", res.Status)
 }

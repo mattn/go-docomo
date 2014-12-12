@@ -6,9 +6,13 @@ import (
 	"github.com/mattn/go-docomo"
 	"github.com/mattn/go-lingr"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"regexp"
 	"strings"
 )
 
@@ -17,6 +21,8 @@ type config struct {
 	Addr   string      `json:"addr"`
 	User   docomo.User `json:"user"`
 }
+
+var re = regexp.MustCompile(`^これ読んで\s+((?:http|https)://\S+)$`)
 
 func main() {
 	f, err := os.Open("config.json")
@@ -66,14 +72,55 @@ func main() {
 			if !strings.HasPrefix(m.Text, nick+":") {
 				continue
 			}
-			text := m.Text[len(nick)+2:]
-			res, err := c.Conversation(text)
-			if err != nil {
-				http.Error(w, err.Error(), 500)
-				return
+			text := strings.TrimSpace(m.Text[len(nick)+2:])
+
+			match := re.FindAllStringSubmatch(text, -1)
+			if len(match) > 0 && len(match[0]) == 2 {
+				u, err := url.Parse(match[0][1])
+				if err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				res, err := http.Get(u.String())
+				if err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				b, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				ct := res.Header.Get("Content-Type")
+				ret, err := c.CharacterRecognition(ct, path.Base(u.Path), b)
+				if err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				w.Header().Set("Content-Type", "text/plain")
+				result := []string{}
+				for _, word := range ret.Words.Word {
+					if word.Text != "" {
+						result = append(result, word.Text)
+					}
+				}
+				if len(result) == 0 && ret.Message.Text != "" {
+					result = append(result, ret.Message.Text)
+				}
+				if len(result) == 0 {
+					w.Write([]byte(fmt.Sprintf("%s: わかりません", m.Nickname)))
+				} else {
+					w.Write([]byte(fmt.Sprintf("%s: %s", m.Nickname, strings.Join(result, ", "))))
+				}
+			} else {
+				ret, err := c.Dialogue(text)
+				if err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				w.Header().Set("Content-Type", "text/plain")
+				w.Write([]byte(fmt.Sprintf("%s: %s", m.Nickname, ret.Utt)))
 			}
-			w.Header().Set("Content-Type", "text/plain")
-			w.Write([]byte(fmt.Sprintf("%s: %s", m.Nickname, res.Utt)))
 		}
 	})
 	http.ListenAndServe(cfg.Addr, nil)
