@@ -116,9 +116,9 @@ func (c *Client) CharacterRecognition(ct, filename string, data []byte) (*Charac
 	w := multipart.NewWriter(&buf)
 	part := make(textproto.MIMEHeader)
 	part.Set("Content-Type", ct)
-    part.Set("Content-Disposition", fmt.Sprintf(`form-data; name="image"; filename="%s"`, filename))
-    f, err := w.CreatePart(part)
-    if err != nil {
+	part.Set("Content-Disposition", fmt.Sprintf(`form-data; name="image"; filename="%s"`, filename))
+	f, err := w.CreatePart(part)
+	if err != nil {
 		return nil, err
 	}
 	_, err = f.Write(data)
