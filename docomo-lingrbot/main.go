@@ -40,7 +40,7 @@ func main() {
 	nick := cfg.User.Nickname
 	http.Handle("/assets/", http.FileServer(http.Dir(".")))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
+		if r.Method == "GET" {
 			f, err := os.Open("index.html")
 			if err != nil {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
